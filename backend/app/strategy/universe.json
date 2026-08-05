@@ -1,0 +1,24 @@
+{
+  "_note": "Editable by hand. 'index' entries map the 7 index-scan symbols from the design doc to their Angel One scrip-master trading symbols. 'sectors' maps each sector bucket to its stock universe (Angel One NSE 'SYMBOL-EQ' format) used for the step-2 sector & stock scan. Review/update this list periodically - it is a curated subset, not a live official constituent feed.",
+  "indices": {
+    "NIFTY 50": { "exchange": "NSE", "symbol": "Nifty 50" },
+    "NIFTY BANK": { "exchange": "NSE", "symbol": "Nifty Bank" },
+    "NIFTY 500": { "exchange": "NSE", "symbol": "Nifty 500" },
+    "NIFTY FIN SERVICE": { "exchange": "NSE", "symbol": "Nifty Fin Service" },
+    "NIFTY IT": { "exchange": "NSE", "symbol": "Nifty IT" },
+    "NIFTY SMLCAP 100": { "exchange": "NSE", "symbol": "NIFTY SMLCAP 100" },
+    "NIFTY MIDCAP 100": { "exchange": "NSE", "symbol": "NIFTY MIDCAP 100" }
+  },
+  "sectors": {
+    "NIFTY BANK": ["HDFCBANK-EQ", "ICICIBANK-EQ", "SBIN-EQ", "KOTAKBANK-EQ", "AXISBANK-EQ", "INDUSINDBK-EQ", "BANKBARODA-EQ", "PNB-EQ", "IDFCFIRSTB-EQ", "AUBANK-EQ"],
+    "NIFTY IT": ["TCS-EQ", "INFY-EQ", "HCLTECH-EQ", "WIPRO-EQ", "TECHM-EQ", "LTTS-EQ", "PERSISTENT-EQ", "COFORGE-EQ"],
+    "NIFTY FIN SERVICE": ["BAJFINANCE-EQ", "BAJAJFINSV-EQ", "HDFCLIFE-EQ", "SBILIFE-EQ", "ICICIGI-EQ", "ICICIPRULI-EQ", "SHRIRAMFIN-EQ", "CHOLAFIN-EQ"],
+    "NIFTY SMLCAP 100": ["CGPOWER-EQ", "SUZLON-EQ", "IEX-EQ", "RAILTEL-EQ", "TANLA-EQ"],
+    "NIFTY MIDCAP 100": ["PERSISTENT-EQ", "FEDERALBNK-EQ", "AUROPHARMA-EQ", "POLYCAB-EQ", "PAGEIND-EQ"],
+    "NIFTY AUTO": ["MARUTI-EQ", "TATAMOTORS-EQ", "M&M-EQ", "BAJAJ-AUTO-EQ", "EICHERMOT-EQ", "HEROMOTOCO-EQ"],
+    "NIFTY PHARMA": ["SUNPHARMA-EQ", "DRREDDY-EQ", "CIPLA-EQ", "DIVISLAB-EQ", "APOLLOHOSP-EQ", "LUPIN-EQ"],
+    "NIFTY FMCG": ["HINDUNILVR-EQ", "ITC-EQ", "NESTLEIND-EQ", "BRITANNIA-EQ", "TATACONSUM-EQ", "DABUR-EQ"],
+    "NIFTY METAL": ["TATASTEEL-EQ", "JSWSTEEL-EQ", "HINDALCO-EQ", "VEDL-EQ", "JINDALSTEL-EQ"],
+    "NIFTY ENERGY": ["RELIANCE-EQ", "ONGC-EQ", "NTPC-EQ", "POWERGRID-EQ", "BPCL-EQ", "COALINDIA-EQ"]
+  }
+}

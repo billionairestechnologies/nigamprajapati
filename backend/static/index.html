@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Strategy Terminal</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <div class="brand">
+    <h1>Strategy Terminal</h1>
+  </div>
+  <div id="engineBar">
+    <span id="biasBadge" class="badge">bias -</span>
+    <span id="dayBadge" class="badge">P&amp;L -</span>
+    <span id="lastScanBadge" class="badge">last scan -</span>
+    <span id="targetBadge" class="badge target hidden">Target hit</span>
+    <span id="engineStatusBadge" class="badge">engine -</span>
+    <label class="switch-label">
+      Mode
+      <select id="runModeSelect">
+        <option value="manual">Manual (approve each signal)</option>
+        <option value="auto">Auto (auto-execute)</option>
+      </select>
+    </label>
+    <label class="switch-label">
+      Trading
+      <select id="paperModeSelect">
+        <option value="paper">Paper (simulated)</option>
+        <option value="live">Live (real orders)</option>
+      </select>
+    </label>
+    <button id="killSwitchBtn" class="danger">Kill Switch</button>
+    <button id="enableAlertsBtn" class="secondary" title="Sound alerts are on by default - click to mute, click again to re-enable">Sound Alerts: On</button>
+    <form method="post" action="/logout"><button type="submit" class="secondary">Logout</button></form>
+  </div>
+</header>
+<div id="errorBanner" class="error-banner hidden"></div>
+
+<nav class="tabs">
+  <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
+  <button class="tab-btn" data-tab="accounts">Accounts</button>
+  <button class="tab-btn" data-tab="orders">Orders</button>
+  <button class="tab-btn" data-tab="history">History</button>
+  <button class="tab-btn" data-tab="logs">Logs</button>
+  <button class="tab-btn" data-tab="settings">Settings</button>
+</nav>
+
+<main>
+  <div id="tab-dashboard" class="tab-panel active">
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Market Bias</h2>
+        <span id="overallBiasPill" class="pill-neutral">-</span>
+      </div>
+      <div id="indexCards" class="card-grid"></div>
+    </section>
+
+    <section class="two-col">
+      <div class="panel">
+        <h2>Top Gainers</h2>
+        <div id="gainersList" class="mover-list"></div>
+      </div>
+      <div class="panel">
+        <h2>Top Losers</h2>
+        <div id="losersList" class="mover-list"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Sector Ranking</h2>
+      <div id="sectorBars" class="bar-list"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Watchlist</h2>
+      <p class="hint">EMA / VWAP / Supertrend / RSI / ADX / Volume - all-bullish or all-bearish alignment (with ADX trending and volume above average) fires a signal. Click a row for the last 5-min candles.</p>
+      <table id="watchlistTable">
+        <thead><tr><th>Symbol</th><th>Sector</th><th>Direction</th><th>Change %</th><th>EMA</th><th>VWAP</th><th>Supertrend</th><th>RSI</th><th>ADX</th><th>Volume</th><th>Aligned</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <section class="panel">
+      <h2>Signals</h2>
+      <p class="hint">Entry / Target / SL are real prices, not just the raw breakout candle range. Outcome tracks what happened even for signals that were never approved/executed, so the strategy itself can be reviewed independently of which trades you actually took.</p>
+      <table id="signalsTable">
+        <thead><tr><th>Symbol</th><th>Direction</th><th>Entry</th><th>Target</th><th>Stop Loss</th><th>Status</th><th>Outcome</th><th>Result %</th><th>Actions</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </div>
+
+  <div id="tab-accounts" class="tab-panel">
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Broker Accounts</h2>
+        <button id="addAccountBtn">+ Add Account</button>
+      </div>
+      <p class="hint">Paper vs Live (top right, "Trading") is a single global switch deciding whether ANY signal places a real order. Capital sizing and max trades per day below are per-account, so accounts with different capital can size independently.</p>
+      <table id="accountsTable">
+        <thead>
+          <tr><th>Label</th><th>Broker</th><th>Status</th><th>Funds</th><th>Sizing</th><th>Capital / Trade</th><th>Trades Today</th><th>Enabled</th><th>Actions</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </div>
+
+  <div id="tab-orders" class="tab-panel">
+    <section class="panel">
+      <h2>Order Log</h2>
+      <table id="ordersTable">
+        <thead><tr><th>Account</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Entry</th><th>Target</th><th>Stop Loss</th><th>Mode</th><th>Status</th><th>P&amp;L</th><th>Note</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </div>
+
+  <div id="tab-history" class="tab-panel">
+    <section class="panel">
+      <h2>Daily Strategy Review</h2>
+      <p class="hint">One row per trading day, snapshotted automatically at day rollover - this is what survives after "today" resets, so you can review how the strategy performed over time.</p>
+      <p class="hint">Click a row to see that day's actual signals - symbol, entry/target/stop, whether it was executed, and the outcome.</p>
+      <table id="historyTable">
+        <thead><tr><th>Date</th><th>Bias</th><th>Mode</th><th>Trades Taken</th><th>Realized P&amp;L</th><th>Signals Fired</th><th>Target Hit</th><th>SL Hit</th><th>Daily Target</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </div>
+
+  <div id="tab-logs" class="tab-panel">
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Strategy / Error Logs</h2>
+        <select id="logLevelSelect">
+          <option value="all">All</option>
+          <option value="warning">Warnings + Errors</option>
+          <option value="error">Errors only</option>
+        </select>
+      </div>
+      <pre id="logView" class="log-view"></pre>
+    </section>
+  </div>
+
+  <div id="tab-settings" class="tab-panel">
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Strategy Settings</h2>
+        <span id="settingsSavedNote" class="hint hidden">Saved.</span>
+      </div>
+      <p class="hint">Capital per trade and max trades per day are set per broker account now - see the Accounts tab, since each account can have different capital. Everything here is shared strategy behavior across all accounts.</p>
+      <form id="settingsForm">
+
+        <div class="settings-subsection">
+          <h3>Daily Risk Limit</h3>
+          <div class="settings-grid">
+            <label>Daily profit target (% of total capital, ALL trades combined)
+              <input type="number" name="daily_profit_target_pct" min="0.5" max="100" step="0.5" required>
+              <span class="field-hint">Portfolio-wide circuit breaker - once today's realized P&amp;L across every trade/account hits this %, the engine stops taking new signals for the day. Not a per-trade number.</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="settings-subsection">
+          <h3>Signal Detection</h3>
+          <div class="settings-grid">
+            <label>Sector move threshold (%)
+              <input type="number" name="sector_move_threshold_pct" min="0.1" max="100" step="0.1" required>
+            </label>
+            <label>Stock move threshold (%)
+              <input type="number" name="stock_move_threshold_pct" min="0.1" max="100" step="0.1" required>
+            </label>
+          </div>
+          <p class="hint" style="margin-top:0.9rem">Confirmation stack - uncheck any indicator you don't want required. A signal fires when every CHECKED directional indicator agrees; at least one of EMA/VWAP/Supertrend/RSI must stay checked.</p>
+          <div class="indicator-toggles">
+            <label class="checkbox-label"><input type="checkbox" name="use_ema"> EMA (20/50 crossover)</label>
+            <label class="checkbox-label"><input type="checkbox" name="use_vwap"> VWAP</label>
+            <label class="checkbox-label"><input type="checkbox" name="use_supertrend"> Supertrend</label>
+            <label class="checkbox-label"><input type="checkbox" name="use_rsi"> RSI</label>
+            <label class="checkbox-label"><input type="checkbox" name="use_adx"> ADX (trend-strength gate)</label>
+            <label class="checkbox-label"><input type="checkbox" name="use_volume"> Volume (above-average gate)</label>
+          </div>
+        </div>
+
+        <div class="settings-subsection">
+          <h3>Per-Trade Target &amp; Stop Loss</h3>
+          <p class="hint">These set the actual entry/target/stop-loss PRICES for every signal - the same for every account. How much MONEY/quantity to risk on those prices is a separate, per-account setting (see the Accounts tab) - the two aren't the same thing even though both are "risk" settings.</p>
+
+          <p class="hint" style="margin-top:0.8rem"><strong>Stop Loss</strong></p>
+          <div class="settings-grid">
+            <label>Stop-loss mode
+              <select name="sl_mode" id="slModeSelect">
+                <option value="candle">Breakout candle low/high</option>
+                <option value="fixed_pct">Fixed % from entry</option>
+                <option value="fixed_points">Fixed points (₹) from entry</option>
+              </select>
+              <span class="field-hint">"Candle" is the original rule: the breakout candle's own low (long) / high (short), so it moves with each signal.</span>
+            </label>
+            <label id="slPctField">Stop-loss (%)
+              <input type="number" name="sl_pct" min="0.1" max="100" step="0.1" required>
+              <span class="field-hint">Stop = entry ∓ (entry × this %). E.g. 1% means stop at entry − 1% for a BUY.</span>
+            </label>
+            <label id="slPointsField">Stop-loss (points / ₹)
+              <input type="number" name="sl_points" min="0.05" step="0.05" required>
+              <span class="field-hint">Stop = entry ∓ this many rupees, a flat distance regardless of price.</span>
+            </label>
+          </div>
+
+          <p class="hint" style="margin-top:0.9rem"><strong>Target</strong></p>
+          <div class="settings-grid">
+            <label>Target mode
+              <select name="target_mode" id="targetModeSelect">
+                <option value="fixed_pct">Fixed % per trade</option>
+                <option value="r_multiple">Stop-distance × R multiple</option>
+              </select>
+              <span class="field-hint">"R multiple" uses whatever stop distance the Stop Loss setting above produces - changing stop-loss mode changes the target too in that case.</span>
+            </label>
+            <label id="targetPctField">Per-trade target (%)
+              <input type="number" name="target_pct" min="0.1" max="100" step="0.1" required>
+              <span class="field-hint">Target = entry ± (entry × this %). E.g. 5% means exit at entry + 5%.</span>
+            </label>
+            <label id="targetRField">Per-trade target (R multiple)
+              <input type="number" name="target_r_multiple" step="0.1" min="0.5" max="10" required>
+              <span class="field-hint">Target = entry ± (stop distance × R). Default 2.0 = 1:2 risk/reward.</span>
+            </label>
+          </div>
+          <p class="hint">Candle interval is fixed at 5 minutes - not configurable.</p>
+        </div>
+
+        <div class="settings-subsection">
+          <h3>Schedule</h3>
+          <div class="settings-grid">
+            <label>Scan time (9:30 default)
+              <input type="text" name="scan_time" pattern="^([01]\d|2[0-3]):[0-5]\d$" placeholder="09:30" required>
+            </label>
+            <label>Square-off time
+              <input type="text" name="squareoff_time" pattern="^([01]\d|2[0-3]):[0-5]\d$" placeholder="15:15" required>
+            </label>
+            <label>Pre-market snapshot (informational only)
+              <input type="text" name="premarket_scan_time" pattern="^([01]\d|2[0-3]):[0-5]\d$" placeholder="09:05" required>
+            </label>
+            <label>Post-market snapshot (informational only)
+              <input type="text" name="postmarket_scan_time" pattern="^([01]\d|2[0-3]):[0-5]\d$" placeholder="15:35" required>
+            </label>
+          </div>
+          <span class="field-hint">Time changes take effect the next time the engine (re)starts. Pre/post-market snapshots only refresh the display - they never touch the trading watchlist.</span>
+        </div>
+
+        <div class="settings-subsection">
+          <h3>Webhook / API Integration</h3>
+          <p class="hint">Sends a JSON POST to this URL whenever a signal fires or an order executes, so you can pipe this strategy into any other algo platform or bot that accepts a webhook (payload: event, symbol, direction, entry/target/stop, and more for order events).</p>
+          <div class="settings-grid">
+            <label class="checkbox-label"><input type="checkbox" name="webhook_enabled"> Enabled</label>
+            <label style="grid-column: span 2">Webhook URL
+              <input type="text" name="webhook_url" id="webhookUrlInput" placeholder="https://your-platform.example.com/webhook">
+            </label>
+          </div>
+          <div class="settings-actions" style="margin-top:0.6rem">
+            <button type="button" id="sendTestWebhookBtn" class="secondary">Send Test Webhook</button>
+            <span id="webhookTestResult" class="hint"></span>
+          </div>
+        </div>
+
+        <div class="settings-actions">
+          <button type="submit">Save Settings</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Symbol / Token Master Data</h2>
+        <span id="masterDataSavedNote" class="hint hidden">Refreshed.</span>
+      </div>
+      <p class="hint">Downloads fresh automatically once per day at startup. Use this if a symbol fails to resolve mid-day (e.g. after a broker-side listing change).</p>
+      <button id="refreshMasterDataBtn" class="secondary">Refresh Master Data</button>
+    </section>
+  </div>
+</main>
+
+<dialog id="candleDialog">
+  <h3 id="candleDialogTitle">Candles</h3>
+  <table id="candleTable">
+    <thead><tr><th>Time</th><th>Open</th><th>High</th><th>Low</th><th>Close</th><th>Volume</th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <div class="dialog-actions">
+    <button type="button" id="closeCandleDialog" class="secondary">Close</button>
+  </div>
+</dialog>
+
+<dialog id="addAccountDialog">
+  <form id="addAccountForm" method="dialog">
+    <h3>Add Broker Account</h3>
+    <label>Label <input name="label" required placeholder="e.g. Angel Main"></label>
+    <label>Broker
+      <select name="broker" id="brokerSelect">
+        <option value="angel_one">Angel One</option>
+        <option value="alice_blue">Alice Blue</option>
+      </select>
+    </label>
+    <p class="hint">Paper vs Live is a global switch on the dashboard header, not set per account - this account is just a market-data/execution connection.</p>
+    <label id="clientIdField">Client ID <input name="client_id" required></label>
+    <label id="apiKeyField">API Key <input name="api_key" required></label>
+    <label id="passwordField">Password / PIN <input name="password"></label>
+    <label id="totpField">TOTP Secret (Angel One only) <input name="totp_secret"></label>
+    <label id="secretField">App Secret (if required) <input name="secret"></label>
+    <p id="aliceBlueNote" class="hint" style="display:none">
+      Alice Blue uses a login redirect, not a password: Client ID = your Alice
+      Blue user ID, API Key = your app's "App Code", App Secret = your app's
+      "API Secret". After saving you'll be sent to Alice Blue to log in.
+    </p>
+    <label>Position sizing
+      <select name="sizing_mode" id="addSizingModeSelect">
+        <option value="pct">% of this account's funds</option>
+        <option value="fixed_amount">Fixed ₹ amount</option>
+      </select>
+    </label>
+    <label id="addCapitalPctField">Capital per trade (%) <input type="number" name="capital_per_trade_pct" min="1" max="100" step="0.5" value="20"></label>
+    <label id="addFixedAmountField">Fixed amount per trade (₹) <input type="number" name="fixed_amount_per_trade" min="0" step="1" value="0"></label>
+    <label>Max trades per day <input type="number" name="max_trades_per_day" min="1" step="1" value="5" required></label>
+    <div class="dialog-actions">
+      <button type="button" id="cancelAddAccount" class="secondary">Cancel</button>
+      <button type="submit">Save & Connect</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="editRiskDialog">
+  <form id="editRiskForm" method="dialog">
+    <h3>Edit Risk Settings</h3>
+    <p class="hint" id="editRiskAccountLabel"></p>
+    <label>Position sizing
+      <select name="sizing_mode" id="editSizingModeSelect">
+        <option value="pct">% of this account's funds</option>
+        <option value="fixed_amount">Fixed ₹ amount</option>
+      </select>
+    </label>
+    <label id="editCapitalPctField">Capital per trade (%) <input type="number" name="capital_per_trade_pct" min="1" max="100" step="0.5"></label>
+    <label id="editFixedAmountField">Fixed amount per trade (₹) <input type="number" name="fixed_amount_per_trade" min="0" step="1"></label>
+    <label>Max trades per day <input type="number" name="max_trades_per_day" min="1" step="1" required></label>
+    <p class="hint" id="editRiskPreview"></p>
+    <div class="dialog-actions">
+      <button type="button" id="cancelEditRisk" class="secondary">Cancel</button>
+      <button type="submit">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="aliceBlueUrlDialog">
+  <h3>Alice Blue Login</h3>
+  <p class="hint">Alice Blue requires logging in on their own page - it redirects back here automatically once you sign in. Open it below, or copy the link to use on another device/browser.</p>
+  <label>Login URL <input type="text" id="aliceBlueUrlInput" readonly></label>
+  <div class="dialog-actions">
+    <button type="button" id="copyAliceBlueUrl" class="secondary">Copy Link</button>
+    <button type="button" id="cancelAliceBlueUrl" class="secondary">Cancel</button>
+    <a id="openAliceBlueUrl" target="_blank" rel="noopener"><button type="button">Open Login Page</button></a>
+  </div>
+</dialog>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

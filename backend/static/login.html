@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Strategy Terminal - Sign in</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="login-body">
+<div class="login-card">
+  <h1>Strategy Terminal</h1>
+  <p class="hint">Sign in to continue.</p>
+  <p id="loginError" class="login-error hidden">Incorrect username or password.</p>
+  <form method="post" action="/login">
+    <label>Username <input name="username" autocomplete="username" autofocus required></label>
+    <label>Password <input name="password" type="password" autocomplete="current-password" required></label>
+    <button type="submit">Sign In</button>
+  </form>
+</div>
+<script>
+  if (new URLSearchParams(location.search).get("error")) {
+    document.getElementById("loginError").classList.remove("hidden");
+  }
+</script>
+</body>
+</html>

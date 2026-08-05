@@ -1,0 +1,16 @@
+# Secrets and local config - never commit real credentials/keys
+backend/.env
+
+# Python virtual environment
+backend/.venv/
+
+# Local runtime data: database (broker credentials, trades), cache, logs
+backend/data/
+backend/logs/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# OS cruft
+.DS_Store
