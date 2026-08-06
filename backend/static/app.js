@@ -239,7 +239,7 @@ async function refreshScanDetail() {
     row.onclick = () => openCandleDialog(g.symbol);
     gList.appendChild(row);
   }
-  if (!(detail.gainers || []).length) gList.innerHTML = `<p class="hint">No scan yet - hit "Scan Now".</p>`;
+  if (!(detail.gainers || []).length) gList.innerHTML = `<p class="hint">No scan yet - runs automatically at market open, or shortly after startup if started mid-day.</p>`;
 
   const lList = $("#losersList");
   lList.innerHTML = "";
@@ -253,7 +253,7 @@ async function refreshScanDetail() {
     row.onclick = () => openCandleDialog(l.symbol);
     lList.appendChild(row);
   }
-  if (!(detail.losers || []).length) lList.innerHTML = `<p class="hint">No scan yet - hit "Scan Now".</p>`;
+  if (!(detail.losers || []).length) lList.innerHTML = `<p class="hint">No scan yet - runs automatically at market open, or shortly after startup if started mid-day.</p>`;
 
   const sBars = $("#sectorBars");
   sBars.innerHTML = "";
@@ -271,7 +271,7 @@ async function refreshScanDetail() {
         <span class="bar-value ${bull ? 'bull' : 'bear'}">${avg}%</span>
       </div>`);
   }
-  if (!sectorEntries.length) sBars.innerHTML = `<p class="hint">No scan yet - hit "Scan Now".</p>`;
+  if (!sectorEntries.length) sBars.innerHTML = `<p class="hint">No scan yet - runs automatically at market open, or shortly after startup if started mid-day.</p>`;
 }
 
 async function openCandleDialog(symbol) {
@@ -477,6 +477,27 @@ async function pollErrorAlerts() {
     recentErrors = recentErrors.slice(0, 8);
     renderErrorBanner();
     speak(freshLines.length === 1 ? "Strategy error - check the dashboard" : `${freshLines.length} strategy errors - check the dashboard`);
+  } catch { /* transient poll failure - try again next tick */ }
+}
+
+// Shows scan progress (a full scan takes 2-5 minutes) regardless of what
+// triggered it - the automatic startup catch-up scan, the daily scheduled
+// scan, or a manual Scan Now click - since this polls the engine's own
+// progress state rather than being tied to a button's click handler.
+const SCAN_RING_CIRCUMFERENCE = 113.1;
+async function pollScanProgress() {
+  try {
+    const p = await api("/api/engine/scan-progress");
+    const banner = $("#scanProgressBanner");
+    if (p.total > 0 && p.label !== "idle") {
+      const pct = Math.round((p.current / p.total) * 100);
+      $("#scanProgressRingFg").style.strokeDashoffset = SCAN_RING_CIRCUMFERENCE * (1 - pct / 100);
+      $("#scanProgressLabel").textContent = p.label;
+      $("#scanProgressPct").textContent = `${pct}% (${p.current}/${p.total})`;
+      banner.classList.remove("hidden");
+    } else {
+      banner.classList.add("hidden");
+    }
   } catch { /* transient poll failure - try again next tick */ }
 }
 
@@ -804,12 +825,21 @@ $("#sendTestWebhookBtn").onclick = withBusyState($("#sendTestWebhookBtn"), "Send
 
 refreshAll();
 pollErrorAlerts();
+pollScanProgress();
 // These endpoints only read our own DB/in-memory state - they never touch
 // the broker API - so polling every few seconds is safe and gives the
 // "live" feel the dashboard needs without any extra rate-limit risk. Each
 // refresh function checks activeTab itself and skips work for hidden tabs.
 setInterval(refreshAll, 2000);
-// Error alerts poll independent of activeTab/refreshAll - an error you'd
-// otherwise only see by clicking into the Logs tab needs to interrupt
-// whichever tab you're actually looking at.
+// Error alerts and scan progress poll independent of activeTab/refreshAll -
+// both need to show up regardless of which tab is open, and scan progress
+// specifically needs to reflect a scan that started on its own (the
+// startup catch-up scan, or the daily scheduled one), not just one
+// triggered from this page.
 setInterval(pollErrorAlerts, 5000);
+setInterval(pollScanProgress, 1000);
+
+$("#scanNowBtn").onclick = withBusyState($("#scanNowBtn"), "Starting...", async () => {
+  await api("/api/engine/scan-now", { method: "POST" });
+  await refreshAll();
+});

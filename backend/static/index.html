@@ -31,12 +31,23 @@
         <option value="live">Live (real orders)</option>
       </select>
     </label>
+    <button id="scanNowBtn" class="secondary">Scan Now</button>
     <button id="killSwitchBtn" class="danger">Kill Switch</button>
     <button id="enableAlertsBtn" class="secondary" title="Sound alerts are on by default - click to mute, click again to re-enable">Sound Alerts: On</button>
     <form method="post" action="/logout"><button type="submit" class="secondary">Logout</button></form>
   </div>
 </header>
 <div id="errorBanner" class="error-banner hidden"></div>
+<div id="scanProgressBanner" class="scan-progress-banner hidden">
+  <svg viewBox="0 0 44 44" class="scan-progress-ring">
+    <circle class="scan-progress-ring-bg" cx="22" cy="22" r="18"></circle>
+    <circle id="scanProgressRingFg" class="scan-progress-ring-fg" cx="22" cy="22" r="18"></circle>
+  </svg>
+  <div class="scan-progress-text">
+    <span id="scanProgressLabel">Scanning...</span>
+    <span id="scanProgressPct">0%</span>
+  </div>
+</div>
 
 <nav class="tabs">
   <button class="tab-btn active" data-tab="dashboard">Dashboard</button>

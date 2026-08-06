@@ -1,4 +1,6 @@
+import datetime as dt
 import logging
+import threading
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 from fastapi import FastAPI, Form, Request
@@ -126,6 +128,39 @@ def _resume_scheduler_if_was_active():
                 # auto-resume - recoverable from the dashboard - instead of
                 # the dashboard never coming up at all.
                 log.error("Could not resume scheduler on startup (check Settings for invalid times): %s", e)
+
+
+@app.on_event("startup")
+def _catch_up_scan_if_missed():
+    """The scan that populates the watchlist/market bias/gainers-losers only
+    runs on its own at the scheduled scan time each day. If the app is
+    started later than that (e.g. mid-morning, or after a crash/restart),
+    today's scan would otherwise never run and the dashboard would sit
+    empty until tomorrow. Run it once in the background on startup if
+    today's window is still open and no scan has happened yet today."""
+    with SessionLocal() as db:
+        state = strategy_engine.get_state(db)
+        if not state.active:
+            return
+        settings = strategy_engine.get_settings(db)
+        already_scanned_today = (
+            state.last_scan_ts is not None
+            and state.last_scan_ts.date() == dt.date.today()
+        )
+    if already_scanned_today:
+        return
+    now = dt.datetime.now()
+    if now.weekday() >= 5:  # Saturday/Sunday
+        return
+    try:
+        scan_time = dt.time.fromisoformat(settings.scan_time)
+        squareoff_time = dt.time.fromisoformat(settings.squareoff_time)
+    except ValueError:
+        return
+    if not (scan_time <= now.time() < squareoff_time):
+        return
+    log.info("No scan done yet today and scan time has passed - running a catch-up scan now")
+    threading.Thread(target=strategy_engine.run_market_scan, daemon=True).start()
 
 
 @app.get("/")
