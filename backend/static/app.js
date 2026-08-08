@@ -135,12 +135,29 @@ $("#editRiskForm").onsubmit = async (e) => {
   refreshAccounts();
 };
 
-function readBadge(value) {
+function readBadge(value, enabled = true) {
   if (value == null) return `<span class="pill-neutral">-</span>`;
   const v = String(value).toLowerCase();
+  if (!enabled) return `<span class="indicator-off-badge">${value}</span>`;
   const cls = v === "bull" || v === "trending" || v === "confirm" ? "pill-bull"
     : v === "bear" ? "pill-bear" : "pill-neutral";
   return `<span class="${cls}">${value}</span>`;
+}
+
+// Cached separately from the Settings tab's own load, since the Watchlist
+// needs to know which indicators are enabled to grey out disabled columns -
+// refreshed periodically since it changes rarely, not on every 2s poll.
+let cachedSettings = null;
+async function refreshSettingsCache() {
+  try {
+    cachedSettings = await api("/api/engine/settings");
+    for (const [key, thId] of [
+      ["use_ema", "thUseEma"], ["use_vwap", "thUseVwap"], ["use_supertrend", "thUseSupertrend"],
+      ["use_rsi", "thUseRsi"], ["use_adx", "thUseAdx"], ["use_volume", "thUseVolume"],
+    ]) {
+      $(`#${thId}`).classList.toggle("indicator-off", !cachedSettings[key]);
+    }
+  } catch { /* transient poll failure - keep the last known settings */ }
 }
 
 async function refreshEngineState() {
@@ -190,8 +207,8 @@ async function refreshEngineState() {
     tr.classList.add("clickable");
     tr.innerHTML = `
       <td>${w.symbol}</td><td>${w.sector}</td><td>${w.direction}</td><td>${w.change_pct}%</td>
-      <td>${readBadge(reads?.ema)}</td><td>${readBadge(reads?.vwap)}</td><td>${readBadge(reads?.supertrend)}</td>
-      <td>${readBadge(reads?.rsi)}</td><td>${readBadge(reads?.adx)}</td><td>${readBadge(reads?.volume)}</td>
+      <td>${readBadge(reads?.ema, cachedSettings?.use_ema !== false)}</td><td>${readBadge(reads?.vwap, cachedSettings?.use_vwap !== false)}</td><td>${readBadge(reads?.supertrend, cachedSettings?.use_supertrend !== false)}</td>
+      <td>${readBadge(reads?.rsi, cachedSettings?.use_rsi !== false)}</td><td>${readBadge(reads?.adx, cachedSettings?.use_adx !== false)}</td><td>${readBadge(reads?.volume, cachedSettings?.use_volume !== false)}</td>
       <td>${ind?.aligned ? `<span class="pill-live">${ind.aligned}</span>` : "-"}</td>
     `;
     tr.onclick = () => openCandleDialog(w.symbol);
@@ -794,6 +811,7 @@ $("#settingsForm").onsubmit = async (e) => {
     return;
   }
   await api("/api/engine/settings", { method: "PATCH", body: JSON.stringify(payload) });
+  await refreshSettingsCache();
   const note = $("#settingsSavedNote");
   note.classList.remove("hidden");
   setTimeout(() => note.classList.add("hidden"), 2500);
@@ -826,6 +844,7 @@ $("#sendTestWebhookBtn").onclick = withBusyState($("#sendTestWebhookBtn"), "Send
 refreshAll();
 pollErrorAlerts();
 pollScanProgress();
+refreshSettingsCache();
 // These endpoints only read our own DB/in-memory state - they never touch
 // the broker API - so polling every few seconds is safe and gives the
 // "live" feel the dashboard needs without any extra rate-limit risk. Each
@@ -838,6 +857,7 @@ setInterval(refreshAll, 2000);
 // triggered from this page.
 setInterval(pollErrorAlerts, 5000);
 setInterval(pollScanProgress, 1000);
+setInterval(refreshSettingsCache, 5000);
 
 $("#scanNowBtn").onclick = withBusyState($("#scanNowBtn"), "Starting...", async () => {
   await api("/api/engine/scan-now", { method: "POST" });

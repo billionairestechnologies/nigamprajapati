@@ -188,8 +188,8 @@ class StrategySettings(Base):
     # NOTE: when target_mode="r_multiple", the target is still derived from
     # WHATEVER stop this produces (stop distance x R) - changing sl_mode
     # changes the target too in that mode, by design.
-    sl_mode = Column(String, default="candle")  # "candle" | "fixed_pct" | "fixed_points"
-    sl_pct = Column(Float, default=1.0)
+    sl_mode = Column(String, default="fixed_pct")  # "candle" | "fixed_pct" | "fixed_points"
+    sl_pct = Column(Float, default=3.0)
     sl_points = Column(Float, default=1.0)
 
     # Confirmation stack toggles - a user who doesn't trust/want a given
@@ -257,8 +257,8 @@ def _migrate_add_missing_columns():
         "use_volume": "BOOLEAN DEFAULT 1",
         "webhook_url": "VARCHAR DEFAULT ''",
         "webhook_enabled": "BOOLEAN DEFAULT 0",
-        "sl_mode": "VARCHAR DEFAULT 'candle'",
-        "sl_pct": "FLOAT DEFAULT 1.0",
+        "sl_mode": "VARCHAR DEFAULT 'fixed_pct'",
+        "sl_pct": "FLOAT DEFAULT 3.0",
         "sl_points": "FLOAT DEFAULT 1.0",
     })
     add_columns("engine_state", {"paper_mode": "BOOLEAN DEFAULT 1"})

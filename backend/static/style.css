@@ -131,6 +131,12 @@ dialog h3 { margin-top: 0; font-size: 0.9rem; color: var(--text); }
 .pill-neutral { color: var(--text-faint); }
 .status-detail { font-size: 0.68rem; color: var(--text-faint); margin-top: 0.15rem; max-width: 220px; }
 
+/* Indicator disabled in Settings - column is greyed out and struck through
+   so it's visually obvious it plays no part in the alignment decision,
+   even though its raw read is still shown for reference. */
+th.indicator-off { color: var(--text-faint); text-decoration: line-through; opacity: 0.6; }
+td .indicator-off-badge { color: var(--text-faint); opacity: 0.55; text-decoration: line-through; }
+
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
 @media (max-width: 800px) { .two-col { grid-template-columns: 1fr; } }
 .hint { color: var(--text-faint); font-size: 0.76rem; margin: 0.3rem 0 0; line-height: 1.5; }
