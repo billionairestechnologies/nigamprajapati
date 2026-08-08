@@ -159,11 +159,13 @@ def _is_rate_limit_error(exc: Exception) -> bool:
 
 def _fetch_confirmation_candles(broker, symbol: str, token: str, from_dt: str, to_dt: str):
     """Candle fetch for the 5-min confirmation stack, with rate-limit
-    backoff/retry matching scanner._fetch_day_change. Also retries once if
-    the broker returns fewer than the 30 candles the confirmation stack
-    needs, since a short response is usually the same throttling rather
-    than a genuine data gap."""
-    max_attempts = 3
+    backoff/retry matching scanner._fetch_day_change. Also retries if the
+    broker returns fewer than the 30 candles the confirmation stack needs,
+    since a short response is usually the same throttling rather than a
+    genuine data gap. 5 attempts (not 3) specifically for rate-limit errors,
+    since a heavy-throttling day can otherwise exhaust 3 quickly and still
+    fail a symbol that would have come through on a 4th or 5th try."""
+    max_attempts = 5
     last_exc = None
     for attempt in range(max_attempts):
         try:
@@ -402,7 +404,16 @@ def _run_confirmation_pass_locked():
         try:
             candles = _fetch_confirmation_candles(broker, item["symbol"], item["token"], from_dt, to_dt)
         except Exception as e:
-            log.error("Candle fetch failed for %s after retries: %s", item["symbol"], e)
+            # A rate limit that survives 5 retries is still just the broker
+            # being busy - the next confirmation pass (5 minutes away) tries
+            # again and usually succeeds, so this isn't worth an alarm sound
+            # for something that isn't actually broken. Anything else
+            # (a real API error, invalid token, etc.) stays loud.
+            if _is_rate_limit_error(e):
+                log.warning("Candle fetch rate-limited for %s after retries, will retry next cycle: %s",
+                            item["symbol"], e)
+            else:
+                log.error("Candle fetch failed for %s after retries: %s", item["symbol"], e)
             time.sleep(0.6)
             continue
 
