@@ -364,12 +364,17 @@
 
 <dialog id="aliceBlueUrlDialog">
   <h3>Alice Blue Login</h3>
-  <p class="hint">Alice Blue requires logging in on their own page - it redirects back here automatically once you sign in. Open it below, or copy the link to use on another device/browser.</p>
+  <p class="hint">Alice Blue requires logging in on their own page - it redirects back here automatically once you sign in. Opens in this tab, so you land back on this dashboard when it's done.</p>
   <label>Login URL <input type="text" id="aliceBlueUrlInput" readonly></label>
+  <p class="hint" id="aliceBlueRedirectHint" style="display:none">
+    One-time setup: in Alice Blue's developer console (where this app/API key was created), set the <strong>Redirect URL</strong> to the value below - it must match exactly, or the login will fail after signing in.
+  </p>
+  <label id="aliceBlueRedirectField" style="display:none">Redirect URL to register <input type="text" id="aliceBlueRedirectInput" readonly></label>
   <div class="dialog-actions">
-    <button type="button" id="copyAliceBlueUrl" class="secondary">Copy Link</button>
+    <button type="button" id="copyAliceBlueUrl" class="secondary">Copy Login Link</button>
+    <button type="button" id="copyAliceBlueRedirect" class="secondary" style="display:none">Copy Redirect URL</button>
     <button type="button" id="cancelAliceBlueUrl" class="secondary">Cancel</button>
-    <a id="openAliceBlueUrl" target="_blank" rel="noopener"><button type="button">Open Login Page</button></a>
+    <a id="openAliceBlueUrl" rel="noopener"><button type="button">Open Login Page</button></a>
   </div>
 </dialog>
 

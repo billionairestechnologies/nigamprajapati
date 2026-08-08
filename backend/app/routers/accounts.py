@@ -1,7 +1,7 @@
 import hashlib
 import datetime as dt
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from .. import security, broker_manager
@@ -189,15 +189,22 @@ def _alice_blue_login_url(account: Account) -> str:
 
 
 @router.get("/{account_id}/alice_blue/login-url")
-def alice_blue_login_url(account_id: int, db: Session = Depends(get_db)):
+def alice_blue_login_url(account_id: int, request: Request, db: Session = Depends(get_db)):
     """Returns the Alice Blue login redirect URL as JSON instead of
     redirecting straight away, so the dashboard can show it to the user
     (copy it, open it on another device/browser, etc.) rather than just
-    silently navigating away."""
+    silently navigating away. Also returns the Redirect URL that must be
+    registered in Alice Blue's own developer console for this app/appcode -
+    a one-time setup step outside this dashboard, and the most common
+    reason the login redirect fails (wrong or missing Redirect URL there)."""
     account = db.get(Account, account_id)
     if not account or account.broker != "alice_blue":
         raise HTTPException(404, "alice_blue account not found")
-    return {"url": _alice_blue_login_url(account)}
+    base = str(request.base_url).rstrip("/")
+    return {
+        "url": _alice_blue_login_url(account),
+        "redirect_url": f"{base}/api/accounts/alice_blue/callback",
+    }
 
 
 @router.get("/{account_id}/alice_blue/login")
@@ -211,42 +218,71 @@ def alice_blue_login(account_id: int, db: Session = Depends(get_db)):
     return RedirectResponse(_alice_blue_login_url(account))
 
 
+def _complete_alice_blue_login(account: Account, authCode: str, userId: str, db: Session):
+    """Exchange authCode/userId plus our app secret for a session token
+    (SHA-256 checksum of userId+authCode+apiSecret, per Alice Blue's vendor
+    API docs), then connect the account.
+
+    Every failure here - the exchange call itself, Alice Blue rejecting the
+    login, or the broker connect step - records the real reason on the
+    account and redirects back to the dashboard instead of showing a raw
+    error page, since a redirect straight to an HTTPException response was
+    reading as "the login just broke" with no way to see why or retry.
+    """
+    try:
+        api_secret = security.decrypt(account.cred_secret)
+        checksum = hashlib.sha256(f"{userId}{authCode}{api_secret}".encode()).hexdigest()
+        resp = httpx.post(ALICE_BLUE_VENDOR_URL, json={"checkSum": checksum}, timeout=15)
+        resp.raise_for_status()
+        data = resp.json()
+        if data.get("stat") != "Ok" or not data.get("userSession"):
+            raise RuntimeError(data.get("emsg") or f"Alice Blue login failed: {data}")
+
+        account.cred_client_id = security.encrypt(data.get("clientId") or userId)
+        account.cred_session_token = security.encrypt(data["userSession"])
+        conn = broker_manager.connect_account(account)
+        account.status = "connected"
+        account.status_message = ""
+        account.available_funds = conn.get_available_funds()
+    except Exception as e:
+        account.status = "error"
+        account.status_message = f"Alice Blue login failed: {e}"
+    db.commit()
+    return RedirectResponse("/")
+
+
+@router.get("/alice_blue/callback")
+def alice_blue_callback_static(authCode: str = "", userId: str = "", appcode: str = "",
+                                db: Session = Depends(get_db)):
+    """Account-agnostic callback for Alice Blue's redirect. Alice Blue's
+    Redirect URL is a fixed value configured once in their own developer
+    console per app (appcode) - it can't contain our internal account id,
+    so this is the URL to register there: it resolves the right account by
+    matching the appcode Alice Blue sends back against each stored Alice
+    Blue account's own API key instead of needing the id in the path."""
+    if not authCode or not userId or not appcode:
+        raise HTTPException(400, "missing authCode/userId/appcode from Alice Blue redirect")
+    candidates = db.query(Account).filter(Account.broker == "alice_blue").all()
+    account = next((a for a in candidates if security.decrypt(a.cred_api_key) == appcode), None)
+    if not account:
+        raise HTTPException(404, f"No Alice Blue account found matching appcode {appcode}")
+    return _complete_alice_blue_login(account, authCode, userId, db)
+
+
 @router.get("/{account_id}/alice_blue/callback")
 def alice_blue_callback(account_id: int, authCode: str = "", userId: str = "",
                          db: Session = Depends(get_db)):
-    """Step 2: Alice Blue redirects here with authCode + userId. Exchange
-    those plus our app secret for a session token (SHA-256 checksum of
-    userId+authCode+apiSecret, per Alice Blue's vendor API docs)."""
+    """Step 2 (legacy, per-account path): Alice Blue redirects here with
+    authCode + userId if the Redirect URL was registered with a specific
+    account id in it. Prefer registering the static /alice_blue/callback
+    route above instead - it works regardless of which account initiated
+    the login."""
     account = db.get(Account, account_id)
     if not account or account.broker != "alice_blue":
         raise HTTPException(404, "alice_blue account not found")
     if not authCode or not userId:
         raise HTTPException(400, "missing authCode/userId from Alice Blue redirect")
-
-    api_secret = security.decrypt(account.cred_secret)
-    checksum = hashlib.sha256(f"{userId}{authCode}{api_secret}".encode()).hexdigest()
-    try:
-        resp = httpx.post(ALICE_BLUE_VENDOR_URL, json={"checkSum": checksum}, timeout=15)
-        resp.raise_for_status()
-        data = resp.json()
-    except Exception as e:
-        raise HTTPException(502, f"Alice Blue auth exchange failed: {e}")
-
-    if data.get("stat") != "Ok" or not data.get("userSession"):
-        raise HTTPException(400, f"Alice Blue login failed: {data.get('emsg', data)}")
-
-    account.cred_client_id = security.encrypt(data.get("clientId") or userId)
-    account.cred_session_token = security.encrypt(data["userSession"])
-    try:
-        conn = broker_manager.connect_account(account)
-        account.status = "connected"
-        account.status_message = ""
-        account.available_funds = conn.get_available_funds()
-    except BrokerError as e:
-        account.status = "error"
-        account.status_message = str(e)
-    db.commit()
-    return RedirectResponse("/")
+    return _complete_alice_blue_login(account, authCode, userId, db)
 
 
 @router.post("/{account_id}/disconnect", response_model=AccountOut)

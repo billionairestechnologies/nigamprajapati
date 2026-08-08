@@ -732,20 +732,27 @@ $("#addAccountForm").onsubmit = async (e) => {
 };
 
 async function openAliceBlueUrlDialog(accountId) {
-  const { url } = await api(`/api/accounts/${accountId}/alice_blue/login-url`);
+  const { url, redirect_url } = await api(`/api/accounts/${accountId}/alice_blue/login-url`);
   $("#aliceBlueUrlInput").value = url;
   $("#openAliceBlueUrl").href = url;
+  if (redirect_url) {
+    $("#aliceBlueRedirectInput").value = redirect_url;
+    $("#aliceBlueRedirectHint").style.display = "";
+    $("#aliceBlueRedirectField").style.display = "";
+    $("#copyAliceBlueRedirect").style.display = "";
+  }
   $("#aliceBlueUrlDialog").showModal();
 }
-$("#copyAliceBlueUrl").onclick = async () => {
-  const input = $("#aliceBlueUrlInput");
-  input.select();
+async function copyToClipboard(inputEl, btnEl, restoreLabel) {
+  inputEl.select();
   try {
-    await navigator.clipboard.writeText(input.value);
-    $("#copyAliceBlueUrl").textContent = "Copied!";
-    setTimeout(() => { $("#copyAliceBlueUrl").textContent = "Copy Link"; }, 1500);
+    await navigator.clipboard.writeText(inputEl.value);
+    btnEl.textContent = "Copied!";
+    setTimeout(() => { btnEl.textContent = restoreLabel; }, 1500);
   } catch { /* clipboard permission denied - the text is still selected for manual copy */ }
-};
+}
+$("#copyAliceBlueUrl").onclick = () => copyToClipboard($("#aliceBlueUrlInput"), $("#copyAliceBlueUrl"), "Copy Login Link");
+$("#copyAliceBlueRedirect").onclick = () => copyToClipboard($("#aliceBlueRedirectInput"), $("#copyAliceBlueRedirect"), "Copy Redirect URL");
 $("#cancelAliceBlueUrl").onclick = () => $("#aliceBlueUrlDialog").close();
 
 // --- Tabs ---
