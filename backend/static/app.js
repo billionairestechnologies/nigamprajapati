@@ -603,15 +603,20 @@ async function loadDayDetail(day, container) {
 // since the table rebuilds on every data refresh.
 let expandedHistoryDay = null;
 let _lastHistoryJson = null;
+let _lastRenderedExpandedDay = undefined; // undefined (not null) so the very first render always runs
 
 async function refreshHistory() {
   if (activeTab !== "history") return;
   const rows = await api("/api/engine/history");
-  // Skip the rebuild entirely when the data hasn't changed, so an expanded
-  // row isn't torn down and recreated (collapsed) on every poll.
+  // Skip the rebuild only when BOTH the data and the expanded day are
+  // unchanged - skipping just on data alone meant clicking a row to expand
+  // it took effect once, then got silently discarded on the next poll
+  // (which sees the same underlying data and bails before ever rendering
+  // the new expanded state).
   const json = JSON.stringify(rows);
-  if (json === _lastHistoryJson) return;
+  if (json === _lastHistoryJson && expandedHistoryDay === _lastRenderedExpandedDay) return;
   _lastHistoryJson = json;
+  _lastRenderedExpandedDay = expandedHistoryDay;
   const tbody = $("#historyTable tbody");
   tbody.innerHTML = "";
   for (const r of rows) {
